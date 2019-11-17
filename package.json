@@ -1,0 +1,15 @@
+{
+  "name": "@olibm/js1-vue",
+  "version": "0.0.1",
+  "description": "js1-vue",
+  "repository": "https://github.com/olibm/js1-vue",
+  "author": "olibm",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "npm audit"
+  },
+  "dependencies": {
+    "@olibm/js1": "^0.0.1"
+  }
+}
