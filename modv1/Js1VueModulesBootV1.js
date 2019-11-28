@@ -74,7 +74,7 @@ function vueProtoCommons(Vue) {
                         converter = Number;
                         break;
                     case 'boolean':
-                        converter = Boolean;
+                        converter = x => !x || x == 0 || x == 'false' ? false : true;
                         break;
                     default:
                         converter = String;
@@ -89,7 +89,6 @@ function vueProtoCommons(Vue) {
             queryName = queryName.replace(/\./g, '_');
             setPath(this, modelName, converter(this.$route.query[queryName] || defaultValue));
             this.$watch(modelName, val => {
-                console.log('bindQS watch', queryName, modelName, patchMode, val);
                 if (!canPatchRoute || canPatchRoute()) {
                     let qval = toQueryConverter(val);
                     if (this.$route.query[queryName] === qval) {
