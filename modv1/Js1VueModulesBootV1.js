@@ -57,14 +57,14 @@ function vueProtoCommons(Vue) {
 
     // These functions need to access this (the component). Feels a bit hacky but it works.
     const withBind = {
-        patchRoute(changes) {
+        patchRoute(changes, mode = 'push') {
             let r = {};
             if (changes.path) r.path = path;
             if (changes.query) r.query = { ...this.$route.query, ...changes.query };
             if (changes.params) r.params = { ...this.$route.params, ...changes.params };
-            this.$router.push(r);
+            this.$router[mode](r);
         },
-        bindQS(queryName, defaultValue = '', { modelName, canPatchRoute, converter, toQueryConverter } = {}) {
+        bindQS(queryName, defaultValue = '', { modelName, canPatchRoute, converter, toQueryConverter, patchMode } = {}) {
             if (typeof arguments[2] === 'string') {
                 modelName = arguments[2];
             }
@@ -85,10 +85,20 @@ function vueProtoCommons(Vue) {
                 toQueryConverter = x => x === null ? '' : String(x);
             }
             modelName = modelName || queryName;
+            patchMode = patchMode || 'push';
+            queryName = queryName.replace(/\./g, '_');
             setPath(this, modelName, converter(this.$route.query[queryName] || defaultValue));
             this.$watch(modelName, val => {
+                console.log('bindQS watch', queryName, modelName, patchMode, val);
                 if (!canPatchRoute || canPatchRoute()) {
-                    this.$js1.patchRoute({ query: { [queryName]: toQueryConverter(val) } })
+                    let qval = toQueryConverter(val);
+                    if (this.$route.query[queryName] === qval) {
+                        return;
+                    }
+                    if (typeof this.$route.query[queryName] === 'undefined' && qval === toQueryConverter(defaultValue)) {
+                        return;
+                    }
+                    this.$js1.patchRoute({ query: { [queryName]: qval } }, patchMode);
                 }
             });
             this.$watch(`$route.query.${queryName}`, val => setPath(this, modelName, converter(val || defaultValue)));
@@ -105,8 +115,11 @@ function vueProtoCommons(Vue) {
             }
             modelPrefix = modelPrefix || queryPrefix;
 
-            for (let key in defaultValue) {
-                this.$js1.bindQS(`${queryPrefix}.${key}`, defaultValue[key], `${modelPrefix}.${key}`);
+            for (let key of Object.getOwnPropertyNames(defaultValue)) {
+                this.$js1.bindQS(`${queryPrefix}.${key}`, defaultValue[key], {
+                    modelName: `${modelPrefix}.${key}`,
+                    patchMode: key === 'page' ? 'push' : 'replace',
+                });
             }
         }
     };
