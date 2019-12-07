@@ -1,4 +1,5 @@
-import { sortBy, cloneDeep, isEqual, defaultsDeep, getPath, hasPath, setPath, unsetPath } from '@olibm/js1'
+import * as JS1 from '@olibm/js1'
+import { defaultsDeep, setPath } from '@olibm/js1'
 
 export default class Js1VueModulesBootV1 {
     constructor({ Modules }) {
@@ -27,14 +28,7 @@ const sym = Symbol('$js1');
 function vueProtoCommons(Vue) {
     // These functions do not need to access this (the component)
     const withoutBind = {
-        sortBy,
-        cloneDeep,
-        isEqual,
-        defaultsDeep,
-        getPath,
-        hasPath,
-        setPath,
-        unsetPath,
+        ...JS1,
         rmkeys(o, ...keys) {
             o = Object.assign({}, o);
             keys.forEach(k => delete o[k]);
