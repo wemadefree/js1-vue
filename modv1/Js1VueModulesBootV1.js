@@ -58,25 +58,29 @@ function vueProtoCommons(Vue) {
             if (changes.params) r.params = { ...this.$route.params, ...changes.params };
             this.$router[mode](r);
         },
-        bindQS(queryName, defaultValue = '', { modelName, canPatchRoute, converter, toQueryConverter, patchMode } = {}) {
+        bindQS(queryName, defaultValue = '', { modelName, canPatchRoute, converter, toQueryConverter, patchMode, nullQueryValue } = {}) {
             if (typeof arguments[2] === 'string') {
                 modelName = arguments[2];
             }
             if (!converter) {
                 switch (typeof defaultValue) {
                     case 'number':
-                        converter = Number;
+                        converter = x => x === nullQueryValue ? null : Number(x);
                         break;
                     case 'boolean':
                         converter = x => !x || x == 0 || x == 'false' ? false : true;
                         break;
                     default:
-                        converter = String;
+                        converter = x => x === nullQueryValue ? null : String(x);
                         break;
                 }
             }
+            if (typeof nullQueryValue !== 'undefined' && typeof nullQueryValue !== 'string') {
+                throw new Error('nullQueryValue must be string or undefined');
+            }
+            nullQueryValue = nullQueryValue || ''
             if (!toQueryConverter) {
-                toQueryConverter = x => x === null ? '' : String(x);
+                toQueryConverter = x => x === null ? nullQueryValue : String(x);
             }
             modelName = modelName || queryName;
             patchMode = patchMode || 'push';
@@ -94,7 +98,10 @@ function vueProtoCommons(Vue) {
                     this.$js1.patchRoute({ query: { [queryName]: qval } }, patchMode);
                 }
             });
-            this.$watch(`$route.query.${queryName}`, val => setPath(this, modelName, converter(val || defaultValue)));
+            this.$watch(`$route.query.${queryName}`, val => {
+                console.log('newqw', typeof val, val)
+                setPath(this, modelName, converter(val || defaultValue))
+            });
         },
         bindPaginateQS(queryPrefix, defaultValue, { modelPrefix } = {}) {
             defaultValue = defaultsDeep(defaultValue || {}, {
@@ -112,6 +119,7 @@ function vueProtoCommons(Vue) {
                 this.$js1.bindQS(`${queryPrefix}.${key}`, defaultValue[key], {
                     modelName: `${modelPrefix}.${key}`,
                     patchMode: key === 'page' ? 'push' : 'replace',
+                    nullQueryValue: 'null',
                 });
             }
         }
