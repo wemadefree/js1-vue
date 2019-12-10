@@ -26,6 +26,14 @@ export default class Js1VueModulesBootV1 {
 
 const sym = Symbol('$js1');
 function vueProtoCommons(Vue) {
+    const paginateOriginalDefaults = {
+        sortBy: null,
+        descending: false,
+        page: 1,
+        rowsPerPage: 25,
+    };
+    let paginateDefaults = { ...paginateOriginalDefaults };
+
     // These functions do not need to access this (the component)
     const withoutBind = {
         ...JS1,
@@ -47,6 +55,9 @@ function vueProtoCommons(Vue) {
         error() {
             console.error.apply(console, arguments);
         },
+        setPaginateDefaults(obj) {
+            paginateDefaults = defaultsDeep({}, obj, paginateOriginalDefaults);
+        }
     };
 
     // These functions need to access this (the component). Feels a bit hacky but it works.
@@ -104,12 +115,7 @@ function vueProtoCommons(Vue) {
             });
         },
         bindPaginateQS(queryPrefix, defaultValue, { modelPrefix } = {}) {
-            defaultValue = defaultsDeep(defaultValue || {}, {
-                sortBy: null,
-                descending: false,
-                page: 1,
-                rowsPerPage: 25,
-            });
+            defaultValue = defaultsDeep(defaultValue || {}, paginateDefaults);
             if (typeof arguments[2] === 'string') {
                 modelPrefix = arguments[2];
             }
@@ -125,9 +131,11 @@ function vueProtoCommons(Vue) {
         }
     };
 
-    if (Vue.prototype.$js1) {
+    if (Vue.$js1 || Vue.prototype.$js1) {
         throw new Error('$js1 commons cannot be initialized twice');
     }
+
+    Vue.$js1 = { ...withoutBind };
 
     Object.defineProperty(Vue.prototype, '$js1', {
         get() {
