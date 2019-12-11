@@ -10,6 +10,6 @@
     "test": "npm audit"
   },
   "dependencies": {
-    "@olibm/js1": "^0.0.1"
+    "@olibm/js1": "^0.0.2"
   }
 }
