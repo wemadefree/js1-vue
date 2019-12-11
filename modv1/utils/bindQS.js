@@ -41,7 +41,6 @@ function bindQS(queryName, defaultValue = '', { modelName, canPatchRoute, conver
         }
     });
     this.$watch(`$route.query.${queryName}`, val => {
-        console.log('newqw', typeof val, val)
         setPath(this, modelName, converter(val || defaultValue))
     });
 }
