@@ -49,7 +49,7 @@ export default function () {
     return [
         {
             bind: true,
-            name: bindQS.name,
+            name: 'bindQS',
             function: bindQS,
         }
     ]

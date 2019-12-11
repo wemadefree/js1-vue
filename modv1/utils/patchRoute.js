@@ -11,7 +11,7 @@ export default function () {
     return [
         {
             bind: true,
-            name: patchRoute.name,
+            name: 'patchRoute',
             function: patchRoute,
         }
     ]

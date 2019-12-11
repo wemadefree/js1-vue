@@ -36,7 +36,7 @@ export default function () {
         },
         {
             bind: true,
-            name: bindPaginateQS.name,
+            name: 'bindPaginateQS',
             function: bindPaginateQS,
         }
     ]
