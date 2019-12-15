@@ -5,6 +5,7 @@ const installers = [
     require('./bindQS').default,
     require('./js1').default,
     require('./misc').default,
+    require('./onRoot').default,
     require('./patchRoute').default,
 ];
 
