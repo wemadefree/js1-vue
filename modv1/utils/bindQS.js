@@ -1,4 +1,4 @@
-import { setPath } from '@olibm/js1'
+import { getPath, setPath } from '@olibm/js1'
 
 function bindQS(queryName, defaultValue = '', { modelName, canPatchRoute, converter, toQueryConverter, patchMode, nullQueryValue } = {}) {
     if (typeof arguments[2] === 'string') {
@@ -45,12 +45,34 @@ function bindQS(queryName, defaultValue = '', { modelName, canPatchRoute, conver
     });
 }
 
+function bindQSM({ target, paths }) {
+    target = target || this;
+    if (!Array.isArray(paths) || paths.some(x => !x || typeof x !== 'string')) {
+        throw new Error('paths must be array of non-empty strings')
+    }
+    paths.forEach(path => {
+        let queryName = path.replace(/\./g, '_');
+        let defaultValue = getPath.call(this, target, path);
+        bindQS.call(this, queryName, defaultValue, {
+            ...arguments[0] || {},
+            modelName: path,
+            target: undefined,
+            paths: undefined,
+        });
+    });
+}
+
 export default function () {
     return [
         {
             bind: true,
             name: 'bindQS',
             function: bindQS,
+        },
+        {
+            bind: true,
+            name: 'bindQSM',
+            function: bindQSM,
         }
     ]
 }
