@@ -1,75 +1,116 @@
-import { sortBy, defaultsDeep, isFunction } from '@olibm/js1'
+import { sortBy, defaultsDeep, isFunction, firstDuplicateBy } from '@olibm/js1'
 
 export default class Js1VueModulesIndexV1 {
-    constructor({ requireModule, modules, routes, storeModules, leftMenuItems, bootFunctions, i18n }) {
+    constructor({ requireModule, modules, externalModules, routes, storeModules, leftMenuItems, bootFunctions, i18n, defaultMenuOrder }) {
         this.requireModule = requireModule;
         this.modules = (modules || []).map(m => typeof m === 'string' ? { key: m } : m);
+        this.externalModules = externalModules || [];
         this.routes = routes || [];
         this.storeModules = storeModules || {};
         this.leftMenuItems = leftMenuItems || [];
         this.bootFunctions = bootFunctions || [];
         this.i18n = i18n || {};
-        this.moduleKeyRegex = /^[a-z0-9-]+$/;
+        this.moduleIdRegex = /^[a-z0-9-]+$/;
+        this.defaultMenuOrder = defaultMenuOrder || 'x-99';
 
         this.init = this.init.bind(this);
     }
 
     init() {
-        const mods = [];
+        // Load modules from key using the provided requireModule() function
+        for (let m of this.modules) {
+            if (!m.module) {
+                if (!isFunction(this.requireModule)) {
+                    throw new Error(`requireModule must be a non-async function that returns the module from key. Example: key => require('./' + key)`)
+                }
 
-        if (!isFunction(this.requireModule)) {
-            throw new Error(`requireModule must be a non-async function that returns the required module by key. Example: key => require('./' + key)`)
+                m.module = this.requireModule(m.key, m);
+
+                if (!m.module) {
+                    throw new Error('requireModule must return a module');
+                }
+
+                if (isFunction(m.module.then)) {
+                    throw new Error(`Promise detected. requireModule must be a non-async function that returns the module from key. Example: key => require('./' + key)`)
+                }
+
+                if (typeof m.module.moduleId === 'undefined') {
+                    m.module.moduleId = m.key;
+                }
+            }
         }
 
-        // Load (require) each module
-        for (let m of this.modules) {
-            if (!this.moduleKeyRegex.test(m.key)) {
-                throw new Error(`Invalid characters in module key '${m.key}'. Must match ${this.moduleKeyRegex.toString()}`);
+        // Load external modules
+        for (let ext of this.externalModules) {
+            let extModules = ext && Array.isArray(ext.externalModules) ? ext.externalModules : [ext];
+            for (let module of extModules) {
+                if (!module || typeof module !== 'object' || module.then) {
+                    throw new Error(`invalid external module`);
+                }
+                if (!module.moduleId) {
+                    console.warn('mod', module)
+                    throw new Error(`externalModules must export a moduleId`);
+                }
+                this.modules.push({
+                    module
+                });
+            }
+        }
+
+        // Validate modules
+        for (let { module } of this.modules) {
+            if (!module || typeof module !== 'object' || module.then) {
+                throw new Error(`invalid module`);
             }
 
-            const mod = this.requireModule(m.key, m);
-
-            if (isFunction(mod.then)) {
-                throw new Error(`Promise detected. requireModule must be a non-async function that returns the required module by key. Example: key => require('./' + key)`)
+            if (!module.moduleId || !this.moduleIdRegex.test(module.moduleId)) {
+                throw new Error(`Invalid moduleId '${module.moduleId}'. Must match ${this.moduleIdRegex.toString()}`);
             }
 
-            mods.push({ mod, m });
+            if (typeof module.default !== 'undefined' && !isFunction(module.default)) {
+                throw new Error(`The default export from a module must be either undefined or a function. Module: ${module.moduleId}`);
+            }
+        }
+
+        let duplicateMod = firstDuplicateBy(this.modules, x => x.module.moduleId);
+        if (duplicateMod) {
+            throw new Error(`Duplicate moduleId ${duplicateMod.module.moduleId}`);
         }
 
         // Synchronous stuff that is required before booting
-        for (let { mod, m } of mods) {
-            if (mod.store) {
-                if (typeof mod.store.namespaced === 'undefined') {
-                    mod.store.namespaced = true;
+        for (let { module } of this.modules) {
+            if (module.store) {
+                if (typeof module.store.namespaced === 'undefined') {
+                    module.store.namespaced = true;
                 }
-                this.storeModules[m.key] = mod.store;
+                this.storeModules[module.moduleId] = module.store;
             }
-            if (mod.i18n) {
-                defaultsDeep(this.i18n, mod.i18n);
+            if (module.i18n) {
+                defaultsDeep(this.i18n, module.i18n);
             }
         }
 
 
         // Queue stuff to do before module boot functions
         this.bootFunctions.push(context => {
-            for (let { mod, m } of mods) {
-                if (mod.store) {
-                    context.store.registerModule(m.key, mod.store);
+            for (let { module } of this.modules) {
+                if (module.store) {
+                    context.store.registerModule(module.moduleId, module.store);
                 }
             }
         })
 
 
         // Queue module boot functions
-        this.bootFunctions.push(...mods.map(x => x.mod.default).filter(x => x));
+        this.bootFunctions.push(...this.modules.map(x => x.module.default).filter(x => x));
 
 
         // Queue stuff to do after module boot functions
         this.bootFunctions.push(context => {
-            for (let { mod, m } of mods) {
+            for (let { module } of this.modules) {
                 // Each module can export routes and menu items
-                if (mod.routes && mod.routes.length) {
-                    mod.routes.forEach(r => {
+                if (module.routes && module.routes.length) {
+                    module.routes.forEach(r => {
                         if (!r.meta) r.meta = {};
 
                         if (typeof r.meta.scopes === 'undefined') {
@@ -86,7 +127,7 @@ export default class Js1VueModulesIndexV1 {
                             this.leftMenuItems.push(menu);
                         }
                     })
-                    this.routes.push(...mod.routes);
+                    this.routes.push(...module.routes);
                 }
             }
         });
@@ -97,7 +138,7 @@ export default class Js1VueModulesIndexV1 {
                 context.router.addRoutes(this.routes);
             }
 
-            this.leftMenuItems.splice(0, this.leftMenuItems.length, ...sortBy(this.leftMenuItems, x => x.order || 'x-99'))
+            this.leftMenuItems.splice(0, this.leftMenuItems.length, ...sortBy(this.leftMenuItems, x => x.order || this.defaultMenuOrder))
         });
 
         return this;
