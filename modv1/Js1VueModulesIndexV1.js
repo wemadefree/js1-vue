@@ -1,7 +1,7 @@
 import { sortBy, defaultsDeep, isFunction, firstDuplicateBy } from '@olibm/js1'
 
 export default class Js1VueModulesIndexV1 {
-    constructor({ requireModule, modules, externalModules, routes, storeModules, leftMenuItems, bootFunctions, i18n, defaultMenuOrder }) {
+    constructor({ requireModule, modules, externalModules, routes, storeModules, leftMenuItems, bootFunctions, i18n, defaultMenuOrder, defaultRouteComponent }) {
         this.requireModule = requireModule;
         this.modules = (modules || []).map(m => typeof m === 'string' ? { key: m } : m);
         this.externalModules = externalModules || [];
@@ -12,6 +12,7 @@ export default class Js1VueModulesIndexV1 {
         this.i18n = i18n || {};
         this.moduleIdRegex = /^[a-z0-9-]+$/;
         this.defaultMenuOrder = defaultMenuOrder || 'x-99';
+        this.defaultRouteComponent = defaultRouteComponent;
 
         this.init = this.init.bind(this);
     }
@@ -117,8 +118,8 @@ export default class Js1VueModulesIndexV1 {
                             r.meta.scopes = ['missing_scope'];
                         }
 
-                        if (!r.component) {
-                            r.component = () => import('layouts/MyLayout.vue');
+                        if (typeof r.component === 'undefined') {
+                            r.component = this.defaultRouteComponent;
                         }
 
                         let menu = r.meta.menuLeft;

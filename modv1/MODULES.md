@@ -18,6 +18,7 @@ import { Js1VueModulesIndex } from '@olibm/js1-vue/modv1'
 
 export default new Js1VueModulesIndex({
     requireModule: key => require('./' + key),
+    defaultRouteComponent: () => import('layouts/MyLayout.vue'),
     // Define your modules here
     modules: [
         'your-module-a',
