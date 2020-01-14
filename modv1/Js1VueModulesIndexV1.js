@@ -1,4 +1,4 @@
-import { sortBy, defaultsDeep, isFunction, firstDuplicateBy } from '@olibm/js1'
+import { sortBy, defaultsDeep, isFunction, firstDuplicateBy, flattenBy, ulidlc } from '@olibm/js1'
 
 export default class Js1VueModulesIndexV1 {
     constructor({ requireModule, modules, externalModules, routes, storeModules, leftMenuItems, bootFunctions, i18n, defaultMenuOrder, defaultRouteComponent }) {
@@ -111,8 +111,9 @@ export default class Js1VueModulesIndexV1 {
             for (let { module } of this.modules) {
                 // Each module can export routes and menu items
                 if (module.routes && module.routes.length) {
-                    module.routes.forEach(r => {
+                    flattenBy(module.routes, 'children').forEach(r => {
                         if (!r.meta) r.meta = {};
+                        if (!r.name && !(r.children && r.children.some(x => x.path === ''))) r.name = ulidlc();
 
                         if (typeof r.meta.scopes === 'undefined') {
                             r.meta.scopes = ['missing_scope'];
@@ -124,10 +125,16 @@ export default class Js1VueModulesIndexV1 {
 
                         let menu = r.meta.menuLeft;
                         if (menu) {
-                            menu.route = menu.route || r.path;
+                            if (!menu.route) {
+                                if (!r.name) {
+                                    menu.route = r.path;
+                                } else {
+                                    menu.route = menu.route || { name: r.name };
+                                }
+                            }
                             this.leftMenuItems.push(menu);
                         }
-                    })
+                    });
                     this.routes.push(...module.routes);
                 }
             }
