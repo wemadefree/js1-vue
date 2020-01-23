@@ -84,6 +84,7 @@ export default class Js1VueModulesIndexV1 {
                 if (typeof module.store.namespaced === 'undefined') {
                     module.store.namespaced = true;
                 }
+                module.store.js1ns = module.store.namespaced ? module.moduleId : '';
                 this.storeModules[module.moduleId] = module.store;
             }
             if (module.i18n) {
