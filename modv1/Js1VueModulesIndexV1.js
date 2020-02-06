@@ -116,10 +116,6 @@ export default class Js1VueModulesIndexV1 {
                         if (!r.meta) r.meta = {};
                         if (!r.name && !(r.children && r.children.some(x => x.path === ''))) r.name = ulidlc();
 
-                        if (typeof r.meta.scopes === 'undefined') {
-                            r.meta.scopes = ['missing_scope'];
-                        }
-
                         if (typeof r.component === 'undefined') {
                             r.component = this.defaultRouteComponent;
                         }
@@ -132,6 +128,9 @@ export default class Js1VueModulesIndexV1 {
                                 } else {
                                     menu.route = menu.route || { name: r.name };
                                 }
+                            }
+                            if (!menu.scopes) {
+                                menu.scopes = r.meta.scopes;
                             }
                             this.leftMenuItems.push(menu);
                         }
