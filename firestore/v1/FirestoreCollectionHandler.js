@@ -55,22 +55,25 @@ export class FirestoreCollectionHandler {
 
     async get(id) {
         let ref = this.colRef.doc(id);
-        console.log('getRef', ref.path)
+        if (process.env.DEV === true) console.log('getRef', ref.path)
         return await ref.get().then(fixFirebaseData);
     }
 
     async put(id, data) {
         let ref = this.colRef.doc(id);
+        if (process.env.DEV === true) console.log('putRef', ref.path, JSON.parse(JSON.stringify(data)));
         await ref.set(data)
     }
 
     async patch(id, data) {
         let ref = this.colRef.doc(id);
+        if (process.env.DEV === true) console.log('patchRef', ref.path, JSON.parse(JSON.stringify(data)));
         await ref.update(data);
     }
 
     async deleteHard(id) {
         let ref = this.colRef.doc(id);
+        if (process.env.DEV === true) console.log('deleteRef', ref.path);
         await ref.delete();
     }
 }
