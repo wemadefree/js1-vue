@@ -17,7 +17,7 @@ function defaultSortBy(row) {
 }
 
 export const idChangedTriggers = [];
-export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete, sortBy, join, collectionHandlerFactory, noCreatedAt, noUpdatedAt } = {}) {
+export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete, sortBy, join, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy } = {}) {
     if (typeof key == 'object') {
         key = key.key;
     }
@@ -218,6 +218,12 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
                 item.updatedAt = item.createdAt;
             }
         }
+        if (!noCreatedBy) {
+            item.createdBy = currentUserId;
+        }
+        if (!noUpdatedAt) {
+            item.updatedBy = currentUserId;
+        }
         await colHandler.put(item.id, item);
         item = await colHandler.get(item.id);
         cx.commit(`${key}Set`, item);
@@ -230,6 +236,9 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
         }
         if (!noUpdatedAt) {
             item.updatedAt = new Date().toISOString();
+        }
+        if (!noUpdatedAt) {
+            item.updatedBy = currentUserId;
         }
         await colHandler.patch(item.id, item);
         item = await colHandler.get(item.id);
