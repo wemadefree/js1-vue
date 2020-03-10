@@ -1,8 +1,15 @@
 import { fixFirebaseData, mapFirebaseData } from './utils'
+import { jsonClone, ulidlc } from '@olibm/js1'
 
 /*
-Workaround for Class constructor cannot be invoked without 'new'
+Extending the class in a webpack project may cause this error:
+  Class constructor cannot be invoked without 'new'
 
+# Workaround A:
+import { FirestoreCollectionHandlerES5 } from '@olibm/js1-vue/firestore/v1'
+export class FirestoreCollectionHandler extends FirestoreCollectionHandlerES5 { constructor() { super(...arguments) } }
+
+# Workaround B:
 import { FirestoreCollectionHandler as FCH } from '@olibm/js1-vue/firestore/v1'
 export class FirestoreCollectionHandler {
     constructor() {
@@ -14,12 +21,13 @@ export class FirestoreCollectionHandler {
 */
 
 export class FirestoreCollectionHandler {
-    constructor(db, { key, noTenantScope, useUserScope, softDelete }, { tenantId, userId }) {
-        this.db = db;
-        this.bindOpts = arguments[1];
-        this.user = arguments[2];
+    constructor({ key, collectionId, noTenantScope, useUserScope, softDelete, firestoreClient }, { tenantId, userId }) {
+        let db = this.db = firestoreClient;
+        this.bindOpts = arguments[0];
+        this.user = arguments[1];
+        collectionId = collectionId || key;
         if (noTenantScope && !useUserScope) {
-            this.colRef = db.collection(key);
+            this.colRef = db.collection(collectionId);
         }
         else {
             if (!tenantId || typeof tenantId !== 'string') {
@@ -36,11 +44,11 @@ export class FirestoreCollectionHandler {
             if (useUserScope) {
                 colRef = (colRef || db).collection('user').doc(userId);
             }
-            this.colRef = colRef.collection(key);
+            this.colRef = colRef.collection(collectionId);
         }
     }
 
-    prepareGetAllQuery() {
+    prepareListQuery() {
         let query = this.colRef;
         if (this.bindOpts.softDelete) {
             query = query.where('deleted', '==', 0);
@@ -48,32 +56,86 @@ export class FirestoreCollectionHandler {
         return query;
     }
 
-    async getAll() {
-        let query = this.prepareGetAllQuery();
+    requireId(id) {
+        if (!id || typeof id !== 'string' || id.includes('/')) {
+            throw new Error('id must be a valid non-empty string');
+        }
+    }
+
+    async listAll() {
+        let query = this.prepareListQuery();
+        if (process.env.DEV === true) console.log('listRef', this.colRef.path);
+        return await query.get().then(mapFirebaseData);
+    }
+
+    async list({ offset, limit } = {}) {
+        let query = this.prepareListQuery().offset(offset || 0).limit(limit || 100);
+        if (process.env.DEV === true) console.log('listRef', this.colRef.path);
         return await query.get().then(mapFirebaseData);
     }
 
     async get(id) {
+        this.requireId(id);
         let ref = this.colRef.doc(id);
-        if (process.env.DEV === true) console.log('getRef', ref.path)
-        return await ref.get().then(fixFirebaseData);
+        if (process.env.DEV === true) console.log('getRef', ref.path);
+        let snap = await ref.get();
+        if (!snap.exists) {
+            let err = new Error(`Document not found: ${ref.path}`);
+            err.statusCode = 404;
+            throw err;
+        }
+        return fixFirebaseData(snap);
     }
 
-    async put(id, data) {
-        let ref = this.colRef.doc(id);
-        if (process.env.DEV === true) console.log('putRef', ref.path, JSON.parse(JSON.stringify(data)));
+    async create(data) {
+        data = jsonClone(data);
+        if (!data.id) {
+            data.id = ulidlc();
+        }
+        if (!this.bindOpts.noTenantScope) {
+            if (data.tenantId && data.tenantId !== this.user.tenantId) {
+                throw new Error('tenantId mismatch in FirestoreCollectionHandler.create');
+            }
+            data.tenantId = this.user.tenantId;
+        }
+        this.requireId(data.id);
+        let ref = this.colRef.doc(data.id);
+        if (process.env.DEV === true) console.log('createRef', ref.path, data);
+        if ((await ref.get({ source: 'server' })).exists) {
+            let err = new Error(`Document already exists: ${ref.path}`);
+            err.statusCode = 409;
+            throw err;
+        }
         await ref.set(data)
+        return data;
     }
 
     async patch(id, data) {
+        this.requireId(id);
+        data = jsonClone(data);
+        if (data.id && data.id !== id) {
+            throw new Error('id mismatch in FirestoreCollectionHandler.update');
+        }
+        if (!this.bindOpts.noTenantScope) {
+            if (data.tenantId && data.tenantId !== this.user.tenantId) {
+                throw new Error('tenantId mismatch in FirestoreCollectionHandler.update');
+            }
+        }
         let ref = this.colRef.doc(id);
-        if (process.env.DEV === true) console.log('patchRef', ref.path, JSON.parse(JSON.stringify(data)));
+        if (process.env.DEV === true) console.log('patchRef', ref.path, data);
         await ref.update(data);
     }
 
-    async deleteHard(id) {
+    async delete(id) {
+        this.requireId(id);
         let ref = this.colRef.doc(id);
         if (process.env.DEV === true) console.log('deleteRef', ref.path);
         await ref.delete();
     }
+}
+
+export function FirestoreCollectionHandlerES5(bindOpts, user) {
+    let workaround = new FirestoreCollectionHandler(...arguments);
+    Object.assign(this, workaround);
+    Object.setPrototypeOf(this, FirestoreCollectionHandler.prototype);
 }

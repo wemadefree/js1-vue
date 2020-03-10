@@ -1,8 +1,10 @@
 import { ulidlc, uniq, sortBy as lodashSortBy } from '@olibm/js1'
 import { FirestoreCollectionHandler } from './FirestoreCollectionHandler'
+import { RestCollectionHandler } from './RestCollectionHandler'
 
 export * from './utils'
 export * from './FirestoreCollectionHandler'
+export * from './RestCollectionHandler'
 
 let firebase = null;
 let defaultFirestore = null;
@@ -17,11 +19,13 @@ function defaultSortBy(row) {
 }
 
 export const idChangedTriggers = [];
-export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete, sortBy, join, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy } = {}) {
+export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete, sortBy, join, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, collectionId } = {}) {
     if (typeof key == 'object') {
         key = key.key;
     }
 
+    collectionId = collectionId || key;
+    firestoreClient = firestoreClient || defaultFirestore;
     join = join || [];
     sortBy = sortBy || defaultSortBy;
     if (typeof sortBy === 'string') {
@@ -34,11 +38,19 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
         join,
         sortBy,
         key,
+        collectionId,
+        firestoreClient,
     };
 
     if (!collectionHandlerFactory) {
-        collectionHandlerFactory = function (bindOpts, user) {
-            return new FirestoreCollectionHandler(defaultFirestore, bindOpts, user);
+        if (restClient) {
+            collectionHandlerFactory = function (bindOpts, user) {
+                return new RestCollectionHandler(bindOpts, user);
+            }
+        } else {
+            collectionHandlerFactory = function (bindOpts, user) {
+                return new FirestoreCollectionHandler(bindOpts, user);
+            }
         }
     }
 
@@ -163,12 +175,19 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
             return existingRow;
         }
 
-        let row = await colHandler.get(id);
-        if (!row) {
-            if (opts.allowMissing) {
-                return false;
+        let row = await colHandler.get(id).catch(err => {
+            if (err.statusCode === 404) {
+                if (opts.allowMissing) {
+                    return;
+                }
+                err = new Error(`row does not exist: ${collectionId}/${id} (${key})`);
+                err.statusCode = 404;
+                throw err;
             }
-            throw new Error(`row does not exist: ${key}/${id}`);
+            throw err;
+        })
+        if (!row) {
+            return false;
         }
         cx.commit(`${key}Set`, row);
         return row;
@@ -186,7 +205,7 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
             return;
         }
 
-        const prom = colHandler.getAll().then(rows => {
+        const prom = colHandler.listAll().then(rows => {
             if (opts.reset) {
                 cx.commit(`${key}Reset`);
             }
@@ -204,9 +223,6 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
     };
 
     s.actions[`${key}Create`] = async function (cx, item) {
-        if (!item.id) {
-            item.id = ulidlc();
-        }
         if (softDelete) {
             item.deleted = item.deleted || 0;
         }
@@ -221,23 +237,19 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
         if (!noCreatedBy) {
             item.createdBy = currentUserId;
         }
-        if (!noUpdatedAt) {
+        if (!noUpdatedBy) {
             item.updatedBy = currentUserId;
         }
-        await colHandler.put(item.id, item);
-        item = await colHandler.get(item.id);
+        item = await colHandler.create(item);
         cx.commit(`${key}Set`, item);
         return item;
     };
 
     s.actions[`${key}Update`] = async function (cx, item) {
-        if (softDelete) {
-            item.deleted = item.deleted || 0;
-        }
         if (!noUpdatedAt) {
             item.updatedAt = new Date().toISOString();
         }
-        if (!noUpdatedAt) {
+        if (!noUpdatedBy) {
             item.updatedBy = currentUserId;
         }
         await colHandler.patch(item.id, item);
@@ -261,7 +273,7 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
             };
             await cx.dispatch(`${key}Update`, item);
         } else {
-            await colHandler.deleteHard(id);
+            await colHandler.delete(id);
         }
         cx.commit(`${key}Remove`, id)
     };
