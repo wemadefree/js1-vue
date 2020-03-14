@@ -19,11 +19,13 @@ function defaultSortBy(row) {
 }
 
 export const idChangedTriggers = [];
-export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete, sortBy, join, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, collectionId } = {}) {
+export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete, sortBy, join, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, collectionId, noRefreshOnTenantIdChange, noRefreshOnUserIdChange } = {}) {
     if (typeof key == 'object') {
         key = key.key;
     }
 
+    noRefreshOnTenantIdChange = !!noRefreshOnTenantIdChange;
+    noRefreshOnUserIdChange = !!noRefreshOnUserIdChange;
     collectionId = collectionId || key;
     firestoreClient = firestoreClient || defaultFirestore;
     join = join || [];
@@ -62,21 +64,31 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
         let { tenantId, userId } = user;
         colHandler = collectionHandlerFactory(bindOpts, user);
 
-        let shouldRefresh;
+        let shouldRefresh, mustReset;
 
         if (currentTenantId !== tenantId) {
             currentTenantId = tenantId;
-            shouldRefresh = shouldRefresh || (tenantId !== 'none' && s.state[`${key}Refreshed`]);
+            if (tenantId === 'none') {
+                mustReset = mustReset || !noRefreshOnTenantIdChange;
+            }
+            shouldRefresh = shouldRefresh || (!noRefreshOnTenantIdChange && s.state[`${key}Refreshed`]);
         }
 
         if (currentUserId !== userId) {
             currentUserId = userId;
-            shouldRefresh = shouldRefresh || (userId !== 'none' && s.state[`${key}Refreshed`]);
+            if (userId === 'none') {
+                mustReset = mustReset || !noRefreshOnUserIdChange;
+            }
+            shouldRefresh = shouldRefresh || (!noRefreshOnUserIdChange && s.state[`${key}Refreshed`]);
         }
 
-        if (shouldRefresh) {
-            let ns = s.js1ns ? `${s.js1ns}/` : '';
-            if (process.env.DEV) console.log('idChangedTriggers refresh', ns, key);
+        let ns = s.js1ns ? `${s.js1ns}/` : '';
+        if (mustReset) {
+            if (process.env.DEV) console.log('idChangedTriggers mustReset', ns, key, { noRefreshOnTenantIdChange, noRefreshOnUserIdChange });
+            (promises || []).push(store.commit(`${ns}${key}Reset`));
+        }
+        else if (shouldRefresh) {
+            if (process.env.DEV) console.log('idChangedTriggers refresh', ns, key, { noRefreshOnTenantIdChange, noRefreshOnUserIdChange });
             (promises || []).push(store.dispatch(`${ns}${key}Refresh`, { reset: true }));
         }
     });
