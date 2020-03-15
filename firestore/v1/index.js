@@ -1,4 +1,4 @@
-import { ulidlc, uniq, sortBy as lodashSortBy } from '@olibm/js1'
+import { ulidlc, uniq, sortBy as lodashSortBy, cloneDeep, pick } from '@olibm/js1'
 import { FirestoreCollectionHandler } from './FirestoreCollectionHandler'
 import { RestCollectionHandler } from './RestCollectionHandler'
 
@@ -6,30 +6,37 @@ export * from './utils'
 export * from './FirestoreCollectionHandler'
 export * from './RestCollectionHandler'
 
-let firebase = null;
 let defaultFirestore = null;
 
 export function setFirebase(fb) {
-    firebase = fb;
     defaultFirestore = fb.firestore();
+}
+
+let bindCollectionDefaults = {};
+export function setBindCollectionDefaults(patch = { noTenantScope, useUserScope, softDelete, sortBy, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, noRefreshOnTenantIdChange, noRefreshOnUserIdChange, updateVer }) {
+    if (patch.collectionId) throw new Error('default value for collectionId is not supported');
+    Object.assign(bindCollectionDefaults, patch);
+    return bindCollectionDefaults;
 }
 
 function defaultSortBy(row) {
     return (row.name || row.id).toLowerCase();
 }
 
+function fixDefault(key, value, fallbackDefault) {
+    if (typeof value === 'undefined') {
+        return typeof bindCollectionDefaults[key] !== 'undefined' ? bindCollectionDefaults[key] : fallbackDefault;
+    }
+    return value;
+}
+
 export const idChangedTriggers = [];
-export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete, sortBy, join, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, collectionId, noRefreshOnTenantIdChange, noRefreshOnUserIdChange } = {}) {
+export function bindCollection(s, key, { collectionId, noTenantScope, useUserScope, softDelete, sortBy, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, noRefreshOnTenantIdChange, noRefreshOnUserIdChange, updateVer } = {}) {
     if (typeof key == 'object') {
         key = key.key;
     }
 
-    noRefreshOnTenantIdChange = !!noRefreshOnTenantIdChange;
-    noRefreshOnUserIdChange = !!noRefreshOnUserIdChange;
-    collectionId = collectionId || key;
-    firestoreClient = firestoreClient || defaultFirestore;
-    join = join || [];
-    sortBy = sortBy || defaultSortBy;
+    sortBy = fixDefault('sortBy', sortBy, defaultSortBy);
     if (typeof sortBy === 'string') {
         const kn = sortBy;
         sortBy = x => x[kn];
@@ -37,20 +44,32 @@ export function bindCollection(s, key, { noTenantScope, useUserScope, softDelete
 
     let bindOpts = {
         ...(arguments[2] || {}),
-        join,
-        sortBy,
         key,
-        collectionId,
-        firestoreClient,
+        collectionId: collectionId = collectionId || key,
+        noTenantScope: noTenantScope = fixDefault('noTenantScope', noTenantScope),
+        useUserScope: useUserScope = fixDefault('useUserScope', useUserScope),
+        softDelete: softDelete = fixDefault('softDelete', softDelete),
+        sortBy,
+        collectionHandlerFactory: collectionHandlerFactory = fixDefault('collectionHandlerFactory', collectionHandlerFactory),
+        noCreatedAt: noCreatedAt = fixDefault('noCreatedAt', noCreatedAt),
+        noUpdatedAt: noUpdatedAt = fixDefault('noUpdatedAt', noUpdatedAt),
+        noCreatedBy: noCreatedBy = fixDefault('noCreatedBy', noCreatedBy),
+        noUpdatedBy: noUpdatedBy = fixDefault('noUpdatedBy', noUpdatedBy),
+        restClient: restClient = fixDefault('restClient', restClient),
+        restBaseUrl: restBaseUrl = fixDefault('restBaseUrl', restBaseUrl),
+        firestoreClient: firestoreClient = fixDefault('firestoreClient', firestoreClient, defaultFirestore),
+        noRefreshOnTenantIdChange: noRefreshOnTenantIdChange = fixDefault('noRefreshOnTenantIdChange', noRefreshOnTenantIdChange),
+        noRefreshOnUserIdChange: noRefreshOnUserIdChange = fixDefault('noRefreshOnUserIdChange', noRefreshOnUserIdChange),
+        updateVer: updateVer = fixDefault('updateVer', updateVer, 1),
     };
 
     if (!collectionHandlerFactory) {
-        if (restClient) {
-            collectionHandlerFactory = function (bindOpts, user) {
+        if (bindOpts.restClient) {
+            bindOpts.collectionHandlerFactory = collectionHandlerFactory = function (bindOpts, user) {
                 return new RestCollectionHandler(bindOpts, user);
             }
         } else {
-            collectionHandlerFactory = function (bindOpts, user) {
+            bindOpts.collectionHandlerFactory = collectionHandlerFactory = function (bindOpts, user) {
                 return new FirestoreCollectionHandler(bindOpts, user);
             }
         }
