@@ -13,7 +13,8 @@ export function setFirebase(fb) {
 }
 
 let bindCollectionDefaults = {};
-export function setBindCollectionDefaults(patch = { noTenantScope, useUserScope, softDelete, sortBy, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, noRefreshOnTenantIdChange, noRefreshOnUserIdChange, updateVer }) {
+export function setBindCollectionDefaults({ noTenantScope, useUserScope, softDelete, sortBy, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, noRefreshOnTenantIdChange, noRefreshOnUserIdChange, updateVer }) {
+    let patch = arguments[0];
     if (patch.collectionId) throw new Error('default value for collectionId is not supported');
     Object.assign(bindCollectionDefaults, patch);
     return bindCollectionDefaults;
