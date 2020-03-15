@@ -276,7 +276,7 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
         return item;
     };
 
-    s.actions[`${key}Update`] = async function (cx, item) {
+    async function updateHelper(cx, item) {
         if (!noUpdatedAt) {
             item.updatedAt = new Date().toISOString();
         }
@@ -284,9 +284,64 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
             item.updatedBy = currentUserId;
         }
         await colHandler.patch(item.id, item);
+    }
+
+    s.actions[`${key}Update`] = async function (cx, item) {
+        switch (updateVer) {
+            case 1: return await cx.dispatch(`${key}Update1`, item);
+            case 2: return await cx.dispatch(`${key}Update2`, item);
+            default: throw new Error(`Unsupported updateVer ${updateVer}`)
+        }
+    };
+
+    // Pros: Update1 fetches the updated object. Using rest the backend may change other fields based on your patch. If you need these changes you need to use Update1
+    // Cons: Update1 may cause race conditions that overwrites concurrent patches. If you patch one field at the time on blur you should consider using Update2 instead
+    s.actions[`${key}Update1`] = async function (cx, item) {
+        await updateHelper(cx, item);
         item = await colHandler.get(item.id);
         cx.commit(`${key}Set`, item);
         return item;
+    };
+
+    s.actions[`${key}Update2`] = async function (cx, item) {
+        await updateHelper(cx, item);
+        let existingItem = cx.state[key][item.id];
+        if (existingItem) {
+            item = Object.assign(cloneDeep(existingItem), item);
+        }
+        else {
+            item = await colHandler.get(item.id);
+        }
+        cx.commit(`${key}Set`, item);
+        return item;
+    };
+
+    s.actions[`${key}UpdateAfterSet2`] = async function (cx, item) {
+        let original = cx.state[key][item.id] || null;
+        if (!original) {
+            throw new Error(`UpdateAfterSet2 required the item to exist in state (${key}/${item.id})`);
+        }
+        let pickedOriginal = cloneDeep(pick(original, Object.keys(item)));
+        cx.commit(`${key}Set`, {
+            ...cloneDeep(original),
+            ...cloneDeep(item),
+        });
+        try {
+            return await cx.dispatch(`${key}Update2`, item);
+        }
+        catch (err) {
+            if (cx.state[key][item.id]) {
+                console.warn('UpdateAfterSet2 error. Reverting to original', key, item.id);
+                cx.commit(`${key}Set`, {
+                    ...cx.state[key][item.id],
+                    ...pickedOriginal
+                });
+            }
+            else {
+                console.warn('UpdateAfterSet2 item is gone after error', key, item.id);
+            }
+            throw err;
+        }
     };
 
     s.actions[`${key}Delete`] = async function (cx, id) {
