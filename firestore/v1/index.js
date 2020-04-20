@@ -1,4 +1,4 @@
-import { ulidlc, uniq, sortBy as lodashSortBy, cloneDeep, pick } from '@olibm/js1'
+import { ulidlc, uniq, sortBy as lodashSortBy, cloneDeep, pick, mapValues } from '@olibm/js1'
 import { FirestoreCollectionHandler } from './FirestoreCollectionHandler'
 import { RestCollectionHandler } from './RestCollectionHandler'
 
@@ -172,6 +172,19 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
         state[`${key}Refreshed`] = true;
     };
 
+    s.mutations[`${key}Append`] = function (state, items) {
+        let map = {};
+        for (let item of items) {
+            validateItem(item);
+            map[item.id] = item;
+        }
+        state[key] = {
+            ...state[key],
+            ...map,
+        };
+        state[`${key}Refreshed`] = true;
+    };
+
     s.mutations[`${key}Reset`] = function (state) {
         state[key] = {};
         state[`${key}Refreshed`] = false;
@@ -226,6 +239,8 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
     };
 
     s.actions[`${key}Refresh`] = async function (cx, opts) {
+        if (process.env.DEV) console.log('refresh', key, { ...opts }, cx.state[`${key}Refreshed`]);
+
         if (typeof opts === 'boolean') {
             opts = { blockOnce: opts };
         }
@@ -396,6 +411,7 @@ export function registerExpander(store, { key, collectionId, dependencies, expan
     const expanderKey = `${key}Expander`;
     const refreshedKey = `${key}Refreshed`;
     const loadingKey = `${key}Loading`;
+    const byKeyKey = `${key}ByKey`;
 
     store.getters[expanderKey] = expander;
 
@@ -405,12 +421,17 @@ export function registerExpander(store, { key, collectionId, dependencies, expan
 
     store.getters[loadingKey] = (_, getters) => !getters[refreshedKey]
 
-    store.getters[key] = (_, getters) => {
+    store.getters[byKeyKey] = (state, getters) => {
         let expander = getters[expanderKey];
-        return getters[collectionId].map(x => expander(x.id));
+        return mapValues(state[collectionId], x => expander(x.id));
+    };
+
+    store.getters[key] = (_, getters) => {
+        return Object.values(getters[byKeyKey]);
     };
 
     store.actions[`${key}Refresh`] = async ({ dispatch }, opts) => {
+        if (process.env.DEV) console.log('refresh', key, { ...opts });
         await Promise.all(deps().map(key => dispatch(`${key}Refresh`, opts)))
     }
 };
