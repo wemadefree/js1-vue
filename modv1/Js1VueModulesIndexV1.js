@@ -120,6 +120,16 @@ export default class Js1VueModulesIndexV1 {
                             r.component = this.defaultRouteComponent;
                         }
 
+                        if (r.meta.pageTitle && r.component) {
+                            let ocomp = r.component;
+                            r.component = async () => {
+                                let o = (await ocomp()).default;
+                                if (!o.meta) o.meta = {};
+                                if (!o.meta.title) o.meta.title = r.meta.pageTitle;
+                                return o;
+                            };
+                        }
+
                         let menu = r.meta.menuLeft;
                         if (menu) {
                             if (!menu.route) {
