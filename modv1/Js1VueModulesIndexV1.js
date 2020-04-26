@@ -144,8 +144,6 @@ export default class Js1VueModulesIndexV1 {
                             r.meta.menu = r.meta.menuLeft;
                         }
 
-                        console.log('jau menu', menu);
-
                         if (menu) {
                             if (!menu.section) {
                                 menu.section = this.defaultMenuSection;
