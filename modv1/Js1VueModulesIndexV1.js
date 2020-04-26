@@ -1,18 +1,20 @@
-import { sortBy, defaultsDeep, isFunction, firstDuplicateBy, flattenBy, ulidlc } from '@olibm/js1'
+import { sortBy, defaultsDeep, isFunction, firstDuplicateBy, flattenBy, ulidlc, forOwn } from '@olibm/js1'
 
 export default class Js1VueModulesIndexV1 {
-    constructor({ requireModule, modules, externalModules, routes, storeModules, leftMenuItems, bootFunctions, i18n, defaultMenuOrder, defaultRouteComponent }) {
+    constructor({ requireModule, modules, externalModules, routes, storeModules, menuItems, bootFunctions, i18n, defaultMenuOrder, defaultRouteComponent, defaultMenuSection }) {
         this.requireModule = requireModule;
         this.modules = (modules || []).map(m => typeof m === 'string' ? { key: m } : m);
         this.externalModules = externalModules || [];
         this.routes = routes || [];
         this.storeModules = storeModules || {};
-        this.leftMenuItems = leftMenuItems || [];
+        this.menuItems = menuItems || [];
+        this.leftMenuItems = []; // deprecated. Use menuItems instead
         this.bootFunctions = bootFunctions || [];
         this.i18n = i18n || {};
         this.moduleIdRegex = /^[a-z0-9-]+$/;
         this.defaultMenuOrder = defaultMenuOrder || 'x-99';
         this.defaultRouteComponent = defaultRouteComponent;
+        this.defaultMenuSection = defaultMenuSection || 'left';
 
         this.init = this.init.bind(this);
     }
@@ -114,7 +116,7 @@ export default class Js1VueModulesIndexV1 {
                 if (module.routes && module.routes.length) {
                     flattenBy(module.routes, 'children').forEach(r => {
                         if (!r.meta) r.meta = {};
-                        if (!r.name && !(r.children && r.children.some(x => x.path === ''))) r.name = ulidlc();
+                        if (!r.name && !(r.children && r.children.some(x => x.path === ''))) r.name = ulidlc().substr(-10);
 
                         if (typeof r.component === 'undefined') {
                             r.component = this.defaultRouteComponent;
@@ -130,23 +132,65 @@ export default class Js1VueModulesIndexV1 {
                             };
                         }
 
-                        let menu = r.meta.menuLeft;
+                        let menu = r.meta.menu;
+                        let menuItems = this.menuItems;
+
+                        if (r.meta.menuLeft) {
+                            console.warn('meta.menuLeft is deprecated. Use meta.menu instead');
+                            if (r.meta.menu) {
+                                throw new Error('meta.menuLeft and meta.menu cannot be defined at the same time');
+                            }
+                            menuItems = this.leftMenuItems;
+                            r.meta.menu = r.meta.menuLeft;
+                        }
+
+                        console.log('jau menu', menu);
+
                         if (menu) {
+                            if (!menu.section) {
+                                menu.section = this.defaultMenuSection;
+                            }
                             if (!menu.route) {
-                                if (!r.name) {
-                                    menu.route = r.path;
-                                } else {
-                                    menu.route = menu.route || { name: r.name };
-                                }
+                                menu.route = !r.name ? r.path : { name: r.name };
                             }
                             if (!menu.scopes) {
                                 menu.scopes = r.meta.scopes;
                             }
-                            this.leftMenuItems.push(menu);
+                            if (!menu.order) {
+                                menu.order = this.defaultMenuOrder;
+                            }
+
+                            if (!menu.name) {
+                                menu.name = menuAutoNameHelper(menu.route, menu.section, menuItems);
+                            }
+                            menuItems.push(menu);
+
+                            if (r.meta.menuSections) {
+                                forOwn(r.meta.menuSections, (menuOverrides, section) => {
+                                    if (menu.section === section) {
+                                        Object.assign(menu, menuOverrides);
+                                    } else {
+                                        let name = menuOverrides.name || menuAutoNameHelper(menuOverrides.route || menu.route, section, menuItems);
+                                        let menuSection = Object.assign({}, menu, menuOverrides, {
+                                            name,
+                                            section
+                                        });
+                                        menuItems.push(menuSection)
+                                    }
+                                });
+                            }
+                        }
+                        else if (Object.keys(r.meta.menuSections || {}).length) {
+                            throw new Error('meta.menu is required when menuSections is defined');
                         }
                     });
                     this.routes.push(...module.routes);
                 }
+            }
+
+            let duplicateMenuName = firstDuplicateBy(this.menuItems, x => x.name);
+            if (duplicateMenuName) {
+                throw new Error(`Duplicate menu name: ${duplicateMenuName.name}`);
             }
         });
 
@@ -156,9 +200,21 @@ export default class Js1VueModulesIndexV1 {
                 context.router.addRoutes(this.routes);
             }
 
-            this.leftMenuItems.splice(0, this.leftMenuItems.length, ...sortBy(this.leftMenuItems, x => x.order || this.defaultMenuOrder))
+            this.leftMenuItems.splice(0, this.leftMenuItems.length, ...sortBy(this.leftMenuItems, x => x.order))
+            this.menuItems.splice(0, this.menuItems.length, ...sortBy(this.menuItems.filter(x => !x.ignore), x => x.order))
         });
 
         return this;
     }
+}
+
+function menuAutoNameHelper(route, section, menuItems) {
+    if (route.name) {
+        let autoName = `${route.name}-${section}`;
+        while (menuItems.find(x => x.name === autoName)) {
+            autoName = `${route.name}-${section}-${ulidlc().substr(-10)}`;
+        }
+        return autoName;
+    }
+    return ulidlc().substr(-10);
 }
