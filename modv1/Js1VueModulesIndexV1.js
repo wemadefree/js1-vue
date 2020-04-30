@@ -1,7 +1,7 @@
-import { sortBy, defaultsDeep, isFunction, firstDuplicateBy, flattenBy, ulidlc, forOwn } from '@olibm/js1'
+import { sortBy, defaultsDeep, isFunction, firstDuplicateBy, flattenBy, ulidlc, forOwn, camelCase } from '@olibm/js1'
 
 export default class Js1VueModulesIndexV1 {
-    constructor({ requireModule, modules, externalModules, routes, storeModules, menuItems, bootFunctions, i18n, defaultMenuOrder, defaultRouteComponent, defaultMenuSection }) {
+    constructor({ requireModule, modules, externalModules, routes, storeModules, menuItems, bootFunctions, i18n, defaultMenuOrder, defaultRouteComponent, defaultMenuSection, storeIdCamelCase }) {
         this.requireModule = requireModule;
         this.modules = (modules || []).map(m => typeof m === 'string' ? { key: m } : m);
         this.externalModules = externalModules || [];
@@ -12,6 +12,8 @@ export default class Js1VueModulesIndexV1 {
         this.bootFunctions = bootFunctions || [];
         this.i18n = i18n || {};
         this.moduleIdRegex = /^[a-z0-9-]+$/;
+        this.storeIdRegex = /^[a-zA-Z0-9-]+$/;
+        this.storeIdCamelCase = !!storeIdCamelCase; // When storeId is set from moduleId it will be camel-cased. Explicitly defined storeIds is left as is.
         this.defaultMenuOrder = defaultMenuOrder || 'x-99';
         this.defaultRouteComponent = defaultRouteComponent;
         this.defaultMenuSection = defaultMenuSection || 'left';
@@ -40,6 +42,13 @@ export default class Js1VueModulesIndexV1 {
                 if (typeof m.module.moduleId === 'undefined') {
                     m.module.moduleId = m.key;
                 }
+
+                if (!m.module.storeId) {
+                    m.module.storeId = m.module.moduleId;
+                    if (this.storeIdCamelCase) {
+                        m.module.storeId = camelCase(m.module.storeId);
+                    }
+                }
             }
         }
 
@@ -53,6 +62,9 @@ export default class Js1VueModulesIndexV1 {
                 if (!module.moduleId) {
                     console.warn('mod', module)
                     throw new Error(`externalModules must export a moduleId`);
+                }
+                if (!m.module.storeId) {
+                    module.storeId = module.moduleId;
                 }
                 this.modules.push({
                     module
@@ -68,6 +80,10 @@ export default class Js1VueModulesIndexV1 {
 
             if (!module.moduleId || !this.moduleIdRegex.test(module.moduleId)) {
                 throw new Error(`Invalid moduleId '${module.moduleId}'. Must match ${this.moduleIdRegex.toString()}`);
+            }
+
+            if (!module.storeId || !this.storeIdRegex.test(module.storeId)) {
+                throw new Error(`Invalid storeId '${module.storeId}'. Must match ${this.storeIdRegex.toString()}`);
             }
 
             if (typeof module.default !== 'undefined' && !isFunction(module.default)) {
@@ -87,7 +103,7 @@ export default class Js1VueModulesIndexV1 {
                     module.store.namespaced = true;
                 }
                 module.store.js1ns = module.store.namespaced ? module.moduleId : '';
-                this.storeModules[module.moduleId] = module.store;
+                this.storeModules[module.storeId] = module.store;
             }
             if (module.i18n) {
                 defaultsDeep(this.i18n, module.i18n);
@@ -99,7 +115,7 @@ export default class Js1VueModulesIndexV1 {
         this.bootFunctions.push(context => {
             for (let { module } of this.modules) {
                 if (module.store) {
-                    context.store.registerModule(module.moduleId, module.store);
+                    context.store.registerModule(module.storeId, module.store);
                 }
             }
         })
@@ -132,7 +148,6 @@ export default class Js1VueModulesIndexV1 {
                             };
                         }
 
-                        let menu = r.meta.menu;
                         let menuItems = this.menuItems;
 
                         if (r.meta.menuLeft) {
@@ -144,6 +159,7 @@ export default class Js1VueModulesIndexV1 {
                             r.meta.menu = r.meta.menuLeft;
                         }
 
+                        let menu = r.meta.menu;
                         if (menu) {
                             if (!menu.section) {
                                 menu.section = this.defaultMenuSection;
@@ -161,17 +177,18 @@ export default class Js1VueModulesIndexV1 {
                             if (!menu.name) {
                                 menu.name = menuAutoNameHelper(menu.route, menu.section, menuItems);
                             }
-                            menuItems.push(menu);
+                            let orgMenu = { ...menu };
+                            menuItems.push(orgMenu);
 
                             if (r.meta.menuSections) {
                                 forOwn(r.meta.menuSections, (menuOverrides, section) => {
                                     if (menu.section === section) {
-                                        Object.assign(menu, menuOverrides);
+                                        Object.assign(orgMenu, menuOverrides);
                                     } else {
                                         let name = menuOverrides.name || menuAutoNameHelper(menuOverrides.route || menu.route, section, menuItems);
                                         let menuSection = Object.assign({}, menu, menuOverrides, {
                                             name,
-                                            section
+                                            section,
                                         });
                                         menuItems.push(menuSection)
                                     }
