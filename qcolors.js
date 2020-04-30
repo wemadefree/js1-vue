@@ -1,3 +1,5 @@
+import { crc32FromIndex } from '@olibm/js1'
+
 export const baseColors = Object.freeze([
     'red',
     'pink',
@@ -24,6 +26,11 @@ export const colors = Object.freeze(baseColors.reduce((colors, baseColor) => {
     for (let i = 1; i < 15; i++) colors.push(`${baseColor}-${i}`);
     return colors
 }, []));
+
+const unfriendlyRegex = /-(1|2|3|11)$/;
+export const friendlyColors = Object.freeze(colors.filter(c => {
+    return !unfriendlyRegex.test(c);
+}));
 
 export function randomColor() {
     return colors[Math.floor(Math.random() * colors.length)];
@@ -316,3 +323,9 @@ export const colorsMap = Object.freeze({
     'blue-grey-13': '#78909c',
     'blue-grey-14': '#455a64',
 });
+
+
+export function friendlyColorFromCrc32(value, returnColorCode) {
+    let o = crc32FromIndex(friendlyColors, value);
+    return returnColorCode ? colorsMap[o] : o;
+}
