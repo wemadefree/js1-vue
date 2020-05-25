@@ -1,4 +1,4 @@
-import { ulidlc, uniq, sortBy as lodashSortBy, cloneDeep, pick, mapValues } from '@olibm/js1'
+import { ulidlc, uniq, sortBy as lodashSortBy, cloneDeep, pick, mapValues, defaultsDeep } from '@olibm/js1'
 import { FirestoreCollectionHandler } from './FirestoreCollectionHandler'
 import { RestCollectionHandler } from './RestCollectionHandler'
 
@@ -13,11 +13,16 @@ export function setFirebase(fb) {
 }
 
 let bindCollectionDefaults = {};
-export function setBindCollectionDefaults({ noTenantScope, useUserScope, softDelete, sortBy, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, noRefreshOnTenantIdChange, noRefreshOnUserIdChange, updateVer }) {
+export function setBindCollectionDefaults({ noTenantScope, useUserScope, softDelete, sortBy, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, noRefreshOnTenantIdChange, noRefreshOnUserIdChange, updateVer, listAllMax, queryParams }) {
     let patch = arguments[0];
     if (patch.collectionId) throw new Error('default value for collectionId is not supported');
     Object.assign(bindCollectionDefaults, patch);
     return bindCollectionDefaults;
+}
+
+export function patchDefaultQueryParams(patch) {
+    bindCollectionDefaults.queryParams = Object.assign({}, bindCollectionDefaults.queryParams || {}, patch || {});
+    return { ...bindCollectionDefaults.queryParams };
 }
 
 function defaultSortBy(row) {
@@ -32,7 +37,7 @@ function fixDefault(key, value, fallbackDefault) {
 }
 
 export const idChangedTriggers = [];
-export function bindCollection(s, key, { collectionId, noTenantScope, useUserScope, softDelete, sortBy, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, noRefreshOnTenantIdChange, noRefreshOnUserIdChange, updateVer } = {}) {
+export function bindCollection(s, key, { collectionId, noTenantScope, useUserScope, softDelete, sortBy, collectionHandlerFactory, noCreatedAt, noUpdatedAt, noCreatedBy, noUpdatedBy, restClient, restBaseUrl, firestoreClient, noRefreshOnTenantIdChange, noRefreshOnUserIdChange, updateVer, queryParams } = {}) {
     if (typeof key == 'object') {
         key = key.key;
     }
@@ -42,6 +47,11 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
         const kn = sortBy;
         sortBy = x => x[kn];
     }
+
+    queryParams = queryParams || {};
+    const prepareQueryParams = qp => {
+        return Object.assign({}, bindCollectionDefaults.queryParams || {}, queryParams, qp);
+    };
 
     let bindOpts = {
         ...(arguments[2] || {}),
@@ -62,7 +72,10 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
         noRefreshOnTenantIdChange: noRefreshOnTenantIdChange = fixDefault('noRefreshOnTenantIdChange', noRefreshOnTenantIdChange),
         noRefreshOnUserIdChange: noRefreshOnUserIdChange = fixDefault('noRefreshOnUserIdChange', noRefreshOnUserIdChange),
         updateVer: updateVer = fixDefault('updateVer', updateVer, 1),
+        queryParams,
+        prepareQueryParams,
     };
+
 
     if (!collectionHandlerFactory) {
         if (bindOpts.restClient) {
@@ -131,8 +144,11 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
 
     s.state[key] = {};
     s.state[`${key}Trash`] = {};
+    s.state[`${key}Appended`] = {};
     s.state[`${key}Refreshed`] = false;
+    s.state[`${key}Busy`] = false;
 
+    s.getters[`${key}Busy`] = state => state[`${key}Busy`] || !state[`${key}Refreshed`];
     s.getters[`${key}Loading`] = state => !state[`${key}Refreshed`];
     s.getters[`${key}Refreshed`] = state => state[`${key}Refreshed`];
 
@@ -162,6 +178,10 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
         return lodashSortBy(getters[key], sortBy);
     };
 
+    s.mutations[`${key}SetBusy`] = function (state, value) {
+        state[`${key}Busy`] = !!value;
+    };
+
     s.mutations[`${key}Refresh`] = function (state, items) {
         let map = {};
         for (let item of items) {
@@ -172,9 +192,12 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
         state[`${key}Refreshed`] = true;
     };
 
-    s.mutations[`${key}Append`] = function (state, items) {
+    s.mutations[`${key}Append`] = function (state, opts) {
+        if (Array.isArray(opts)) {
+            opts = { rows: opts };
+        }
         let map = {};
-        for (let item of items) {
+        for (let item of opts.rows) {
             validateItem(item);
             map[item.id] = item;
         }
@@ -182,12 +205,16 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
             ...state[key],
             ...map,
         };
+        if (opts.appendedKey) {
+            state[`${key}Appended`][opts.appendedKey] = true;
+        }
         state[`${key}Refreshed`] = true;
     };
 
     s.mutations[`${key}Reset`] = function (state) {
         state[key] = {};
         state[`${key}Refreshed`] = false;
+        state[`${key}Appended`] = {};
     };
 
     s.mutations[`${key}Set`] = function (state, item) {
@@ -239,57 +266,86 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
     };
 
     s.actions[`${key}Refresh`] = async function (cx, opts) {
-        if (process.env.DEV) console.log('refresh', key, { ...opts }, cx.state[`${key}Refreshed`]);
+        try {
+            if (process.env.DEV) console.log('refresh', key, { ...opts }, cx.state[`${key}Refreshed`]);
+            cx.commit(`${key}SetBusy`, true);
 
-        if (typeof opts === 'boolean') {
-            opts = { blockOnce: opts };
-        }
-        opts = opts || {};
-
-        const refreshed = cx.state[`${key}Refreshed`];
-
-        if (opts.once && refreshed) {
-            return;
-        }
-
-        const prom = colHandler.listAll().then(rows => {
-            if (opts.reset) {
-                cx.commit(`${key}Reset`);
+            if (typeof opts === 'boolean') {
+                opts = { blockOnce: opts };
             }
-            cx.commit(`${key}Refresh`, rows);
-        });
+            opts = opts || {};
 
-        if (refreshed && opts.blockOnce) {
-            prom.catch(err => {
-                console.warn(`${key}Refresh failed but no error is thrown due to blockOnce`, err);
+            let append = !!(opts.append || typeof opts.append === 'string'); // Empty string means true
+            let appendedKey = typeof opts.append === 'string' && opts.append;
+
+            let qp = prepareQueryParams(opts.queryParams);
+
+            const refreshed = !!(cx.state[`${key}Refreshed`] && (!appendedKey || cx.state[`${key}Appended`][appendedKey]));
+
+            if (!refreshed && opts.skipFirst) {
+                return;
+            }
+
+            if (opts.once && refreshed) {
+                return;
+            }
+
+            const prom = colHandler.listAll(qp).then(rows => {
+                if (append) {
+                    cx.commit(`${key}Append`, {
+                        rows,
+                        appendedKey,
+                    });
+                }
+                else {
+                    if (opts.reset) {
+                        cx.commit(`${key}Reset`);
+                    }
+                    cx.commit(`${key}Refresh`, rows);
+                }
             });
+
+            if (refreshed && opts.blockOnce) {
+                prom.catch(err => {
+                    console.warn(`${key}Refresh failed but no error is thrown due to blockOnce`, err);
+                });
+            }
+            else {
+                await prom;
+            }
         }
-        else {
-            await prom;
+        finally {
+            cx.commit(`${key}SetBusy`, false);
         }
     };
 
     s.actions[`${key}Create`] = async function (cx, item) {
-        if (softDelete) {
-            item.deleted = item.deleted || 0;
-        }
-        if (!noCreatedAt) {
-            if (!item.createdAt) {
-                item.createdAt = new Date().toISOString();
+        try {
+            cx.commit(`${key}SetBusy`, true);
+            if (softDelete) {
+                item.deleted = item.deleted || 0;
             }
-            if (!item.updatedAt && !noUpdatedAt) {
-                item.updatedAt = item.createdAt;
+            if (!noCreatedAt) {
+                if (!item.createdAt) {
+                    item.createdAt = new Date().toISOString();
+                }
+                if (!item.updatedAt && !noUpdatedAt) {
+                    item.updatedAt = item.createdAt;
+                }
             }
+            if (!noCreatedBy) {
+                item.createdBy = currentUserId;
+            }
+            if (!noUpdatedBy) {
+                item.updatedBy = currentUserId;
+            }
+            item = await colHandler.create(item);
+            cx.commit(`${key}Set`, item);
+            return item;
         }
-        if (!noCreatedBy) {
-            item.createdBy = currentUserId;
+        finally {
+            cx.commit(`${key}SetBusy`, false);
         }
-        if (!noUpdatedBy) {
-            item.updatedBy = currentUserId;
-        }
-        item = await colHandler.create(item);
-        cx.commit(`${key}Set`, item);
-        return item;
     };
 
     async function updateHelper(cx, item) {
@@ -313,23 +369,35 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
     // Pros: Update1 fetches the updated object. Using rest the backend may change other fields based on your patch. If you need these changes you need to use Update1
     // Cons: Update1 may cause race conditions that overwrites concurrent patches. If you patch one field at the time on blur you should consider using Update2 instead
     s.actions[`${key}Update1`] = async function (cx, item) {
-        await updateHelper(cx, item);
-        item = await colHandler.get(item.id);
-        cx.commit(`${key}Set`, item);
-        return item;
+        try {
+            cx.commit(`${key}SetBusy`, true);
+            await updateHelper(cx, item);
+            item = await colHandler.get(item.id);
+            cx.commit(`${key}Set`, item);
+            return item;
+        }
+        finally {
+            cx.commit(`${key}SetBusy`, false);
+        }
     };
 
     s.actions[`${key}Update2`] = async function (cx, item) {
-        await updateHelper(cx, item);
-        let existingItem = cx.state[key][item.id];
-        if (existingItem) {
-            item = Object.assign(cloneDeep(existingItem), item);
+        try {
+            cx.commit(`${key}SetBusy`, true);
+            await updateHelper(cx, item);
+            let existingItem = cx.state[key][item.id];
+            if (existingItem) {
+                item = Object.assign(cloneDeep(existingItem), item);
+            }
+            else {
+                item = await colHandler.get(item.id);
+            }
+            cx.commit(`${key}Set`, item);
+            return item;
         }
-        else {
-            item = await colHandler.get(item.id);
+        finally {
+            cx.commit(`${key}SetBusy`, false);
         }
-        cx.commit(`${key}Set`, item);
-        return item;
     };
 
     s.actions[`${key}UpdateAfterSet2`] = async function (cx, item) {
@@ -361,23 +429,29 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
     };
 
     s.actions[`${key}Delete`] = async function (cx, id) {
-        if (typeof id === 'object') {
-            id = id.id;
+        try {
+            cx.commit(`${key}SetBusy`, true);
+            if (typeof id === 'object') {
+                id = id.id;
+            }
+            if (!id || typeof id !== 'string') {
+                throw new Error('invalid id in delete');
+            }
+            if (softDelete) {
+                let item = await cx.dispatch(`${key}Get`, id);
+                item = {
+                    ...item,
+                    deleted: Date.now(),
+                };
+                await cx.dispatch(`${key}Update`, item);
+            } else {
+                await colHandler.delete(id);
+            }
+            cx.commit(`${key}Remove`, id)
         }
-        if (!id || typeof id !== 'string') {
-            throw new Error('invalid id in delete');
+        finally {
+            cx.commit(`${key}SetBusy`, false);
         }
-        if (softDelete) {
-            let item = await cx.dispatch(`${key}Get`, id);
-            item = {
-                ...item,
-                deleted: Date.now(),
-            };
-            await cx.dispatch(`${key}Update`, item);
-        } else {
-            await colHandler.delete(id);
-        }
-        cx.commit(`${key}Remove`, id)
     };
 }
 
@@ -411,12 +485,17 @@ export function registerExpander(store, { key, collectionId, dependencies, expan
     const expanderKey = `${key}Expander`;
     const refreshedKey = `${key}Refreshed`;
     const loadingKey = `${key}Loading`;
+    const busyKey = `${key}Busy`;
     const byKeyKey = `${key}ByKey`;
 
     store.getters[expanderKey] = expander;
 
     store.getters[refreshedKey] = (_, getters) => {
         return deps().every(dep => getters[`${dep}Refreshed`]);
+    };
+
+    store.getters[busyKey] = (_, getters) => {
+        return deps().some(dep => getters[`${dep}Busy`]);
     };
 
     store.getters[loadingKey] = (_, getters) => !getters[refreshedKey]

@@ -57,7 +57,7 @@ class RestClient {
             return transformAxiosResp(axiosResp, options);
         }
         catch (err) {
-            if (options.debug) console.log('requestp-res', { method: options.method, url: options.url, err, options, axiosOptions });
+            if (options.debug) console.warn('requestp-res', { method: options.method, url: options.url, err, options, axiosOptions });
             if (err.isAxiosError) {
                 if (err.response) {
                     return transformAxiosResp(err.response, options);

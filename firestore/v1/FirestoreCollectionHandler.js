@@ -62,8 +62,10 @@ export class FirestoreCollectionHandler {
         }
     }
 
-    async listAll() {
-        let query = this.prepareListQuery();
+    async listAll(queryParams) {
+        queryParams = queryParams || {};
+        queryParams.limit = queryParams.limit || 10000;
+        let query = this.prepareListQuery().limit(queryParams.limit);
         if (process.env.DEV === true) console.log('listRef', this.colRef.path);
         return await query.get().then(mapFirebaseData);
     }

@@ -39,11 +39,11 @@ export class RestCollectionHandler {
         return this.baseUrl;
     }
 
-    prepareListRequest({ offset, limit } = {}) {
+    prepareListRequest(queryParams) {
         return {
             method: 'GET',
             url: this.prepareBaseUrl(),
-            qs: { offset, limit },
+            qs: queryParams,
             json: true,
         };
     }
@@ -75,17 +75,14 @@ export class RestCollectionHandler {
         return resp;
     }
 
-    async listAll() {
-        let rows = await this.list({ limit: 1000 });
-        if (rows.length >= 1000) {
-            // TODO: Implement multiple calls to fetch all rows
-            throw new Error('listAll failed to list all rows due to missing implementation');
-        }
-        return rows;
+    async listAll(queryParams) {
+        queryParams = queryParams || {};
+        queryParams.limit = queryParams.limit || 1000;
+        return await this.list(queryParams);
     }
 
-    async list(opts) {
-        let request = this.prepareListRequest(opts);
+    async list(queryParams) {
+        let request = this.prepareListRequest(queryParams);
         if (process.env.DEV) console.log('listRest', request);
         return await this.restClient(request).then(resp => this.extractListFromResp(resp, request));
     }
