@@ -5,7 +5,7 @@ const axios = require('axios');
 
 function cloneOptions(options) {
     options = { ...options };
-    if (options.query) options.query = { ...options.query };
+    if (options.qs) options.qs = { ...options.qs };
     if (options.headers) options.headers = { ...options.headers };
     return options;
 }
@@ -70,6 +70,24 @@ class RestClient {
             throw new RestClientError(`Unexpected API error: ${err.message}`);
         }
     }
+
+    make() {
+        let request = this.request.bind(this);
+        request.get = requestMethodFn.bind({ method: 'GET', request });
+        request.put = requestMethodFn.bind({ method: 'PUT', request });
+        request.post = requestMethodFn.bind({ method: 'POST', request });
+        request.patch = requestMethodFn.bind({ method: 'PATCH', request });
+        request.delete = requestMethodFn.bind({ method: 'DELETE', request });
+        return request;
+    }
+}
+
+async function requestMethodFn(url, options) {
+    return await this.request({
+        ...options || {},
+        method: this.method,
+        url,
+    });
 }
 
 class RestClientError extends Error {
