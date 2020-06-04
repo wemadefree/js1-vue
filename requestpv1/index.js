@@ -104,6 +104,7 @@ class RestClientHttpError extends RestClientError {
         this.status = response.statusCode;
         this.statusCode = response.statusCode;
         this.responseBody = response.body;
+        this.error = response.body;
         this.errorType = response.body && response.body.type || 'unknown';
         this.errorTitle = response.body && response.body.title || '';
         this.errorDetail = response.body && response.body.detail || '';
