@@ -1,6 +1,6 @@
 {
   "name": "@olibm/js1-vue",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "js1-vue",
   "repository": "https://github.com/olibm/js1-vue",
   "author": "olibm",
@@ -10,6 +10,6 @@
     "test": "npm audit"
   },
   "dependencies": {
-    "@olibm/js1": "~0.0.5"
+    "@olibm/js1": "0.0.6"
   }
 }
