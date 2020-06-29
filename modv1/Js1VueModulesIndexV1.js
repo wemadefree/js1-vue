@@ -134,18 +134,30 @@ export default class Js1VueModulesIndexV1 {
                         if (!r.meta) r.meta = {};
                         if (!r.name && !(r.children && r.children.some(x => x.path === ''))) r.name = ulidlc().substr(-10);
 
-                        if (typeof r.component === 'undefined') {
+                        if (typeof r.component === 'undefined' && typeof r.components === 'undefined') {
+                            // TODO: This looks wierd. Nested routes may get multiple layouts applied? Please investigate
                             r.component = this.defaultRouteComponent;
                         }
 
-                        if (r.meta.pageTitle && r.component) {
-                            let ocomp = r.component;
-                            r.component = async () => {
+
+                        if (r.meta.pageTitle && (r.component || (r.components && r.components.default))) {
+                            let ocomp;
+                            const ncomp = async () => {
                                 let o = (await ocomp()).default;
-                                if (!o.meta) o.meta = {};
-                                if (!o.meta.title) o.meta.title = r.meta.pageTitle;
+                                if (!isFunction(o.meta)) {
+                                    if (!o.meta) o.meta = {};
+                                    if (!o.meta.title) o.meta.title = r.meta.pageTitle;
+                                }
                                 return o;
                             };
+                            if (r.component) {
+                                ocomp = r.component;
+                                r.component = ncomp;
+                            }
+                            else {
+                                ocomp = r.components.default;
+                                r.components.default = ncomp;
+                            }
                         }
 
                         let menuItems = this.menuItems;
