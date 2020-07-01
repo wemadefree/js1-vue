@@ -1,15 +1,19 @@
 import { ulidlc, uniq, sortBy as lodashSortBy, cloneDeep, pick, mapValues, defaultsDeep } from '@olibm/js1'
 import { FirestoreCollectionHandler } from './FirestoreCollectionHandler'
 import { RestCollectionHandler } from './RestCollectionHandler'
+import { getFirebase } from '../../firebase'
 
+export { setFirebase } from '../../firebase'
 export * from './utils'
 export * from './FirestoreCollectionHandler'
 export * from './RestCollectionHandler'
 
-let defaultFirestore = null;
-
-export function setFirebase(fb) {
-    defaultFirestore = fb.firestore();
+let _defaultFirestore = null;
+function getDefaultFirestore() {
+    if (!_defaultFirestore) {
+        _defaultFirestore = getFirebase().firestore();
+    }
+    return _defaultFirestore;
 }
 
 let bindCollectionDefaults = {};
@@ -68,7 +72,7 @@ export function bindCollection(s, key, { collectionId, noTenantScope, useUserSco
         noUpdatedBy: noUpdatedBy = fixDefault('noUpdatedBy', noUpdatedBy),
         restClient: restClient = fixDefault('restClient', restClient),
         restBaseUrl: restBaseUrl = fixDefault('restBaseUrl', restBaseUrl),
-        firestoreClient: firestoreClient = fixDefault('firestoreClient', firestoreClient, defaultFirestore),
+        firestoreClient: firestoreClient = fixDefault('firestoreClient', firestoreClient, getDefaultFirestore()),
         noRefreshOnTenantIdChange: noRefreshOnTenantIdChange = fixDefault('noRefreshOnTenantIdChange', noRefreshOnTenantIdChange),
         noRefreshOnUserIdChange: noRefreshOnUserIdChange = fixDefault('noRefreshOnUserIdChange', noRefreshOnUserIdChange),
         updateVer: updateVer = fixDefault('updateVer', updateVer, 1),
