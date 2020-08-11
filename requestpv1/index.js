@@ -32,6 +32,8 @@ function prepareOptions(options, defaultOptions) {
 
 class RestClient {
     constructor(options) {
+        this._preHooks = [];
+        this._responseHooks = [];
         this.configure(options);
     }
 
@@ -40,8 +42,19 @@ class RestClient {
         return this;
     }
 
+    preHook(handler) {
+        this._preHooks.push(handler);
+    }
+
+    responseHook(handler) {
+        this._responseHooks.push(handler);
+    }
+
     async request(options) {
-        options = prepareOptions(options, this.options)
+        options = prepareOptions(options, this.options);
+
+        await callHookListeners(this._preHooks, { type: 'pre', options });
+
         let axiosOptions = toAxiosOptions(options);
 
         if (options.debug) console.log('requestp-req', { method: options.method, url: options.url, options, axiosOptions });
@@ -50,17 +63,27 @@ class RestClient {
             throw new Error('json=false is not implemented yet');
         }
 
+        let wasHookError = false;
         try {
             let axiosResp = await axios(axiosOptions);
             let resp = transformAxiosResp(axiosResp, options);
+            await callHookListeners(this._responseHooks, { hook: 'response', options, response: resp }).catch(err => {
+                wasHookError = true;
+                throw err;
+            });
             if (options.debug) console.log('requestp-res', { method: options.method, url: options.url, resp, axiosResp, options, axiosOptions });
-            return transformAxiosResp(axiosResp, options);
+            return resp;
         }
         catch (err) {
             if (options.debug) console.warn('requestp-res', { method: options.method, url: options.url, err, options, axiosOptions });
+            if (wasHookError) {
+                throw err;
+            }
             if (err.isAxiosError) {
                 if (err.response) {
-                    return transformAxiosResp(err.response, options);
+                    let resp = transformAxiosResp(err.response, options);
+                    await callHookListeners(this._responseHooks, { hook: 'response', options, response: resp });
+                    return resp
                 }
                 else if (err.request) {
                     throw new RestClientError(`API request error: ${err.message}`);
@@ -88,6 +111,14 @@ async function requestMethodFn(url, options) {
         method: this.method,
         url,
     });
+}
+
+async function callHookListeners(listeners, ev) {
+    if (Array.isArray(listeners)) {
+        for (let l of listeners) {
+            await l.call(null, ev);
+        }
+    }
 }
 
 class RestClientError extends Error {
