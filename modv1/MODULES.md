@@ -21,7 +21,7 @@ export default async function ({ }) {
 import { Js1VueModulesIndex } from '@olibm/js1-vue/modv1'
 
 export default new Js1VueModulesIndex({
-    requireModule: key => require('./' + key),
+    requireModule: key => require('./' + key + '/index'),
     defaultRouteComponent: () => import('layouts/MyLayout.vue'),
     storeIdCamelCase: true,
     // Define your modules here
