@@ -1,6 +1,6 @@
 'use strict'
 
-const defaultsDeep = require('lodash.defaultsdeep');
+const { defaultsDeep } = require('@olibm/js1');
 const axios = require('axios');
 
 function cloneOptions(options) {
