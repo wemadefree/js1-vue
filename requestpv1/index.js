@@ -50,6 +50,10 @@ class RestClient {
         this._responseHooks.push(handler);
     }
 
+    cancelToken() {
+        return axios.CancelToken.source();
+    }
+
     async request(options) {
         options = prepareOptions(options, this.options);
 
@@ -75,6 +79,11 @@ class RestClient {
             return resp;
         }
         catch (err) {
+            if (axios.isCancel(err)) {
+                let terr = new RestClientError('API request cancelled');
+                terr.isCancel = true;
+                throw terr;
+            }
             if (options.debug) console.warn('requestp-res', { method: options.method, url: options.url, err, options, axiosOptions });
             if (wasHookError) {
                 throw err;
@@ -101,6 +110,7 @@ class RestClient {
         request.post = requestMethodFn.bind({ method: 'POST', request });
         request.patch = requestMethodFn.bind({ method: 'PATCH', request });
         request.delete = requestMethodFn.bind({ method: 'DELETE', request });
+        request.cancelToken = this.cancelToken.bind(this);
         return request;
     }
 }
@@ -172,6 +182,7 @@ function toAxiosOptions(options) {
         headers: options.headers,
         params: options.qs,
         data: options.body,
+        cancelToken: options.cancelToken,
     };
 
     if (options.auth.bearer) {
