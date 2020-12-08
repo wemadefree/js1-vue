@@ -23,6 +23,7 @@ function prepareOptions(options, defaultOptions) {
         transform2xxOnly: true,
         json: true,
         debug: false,
+        debugResponse: false,
     });
     if (!options.qs) options.qs = {};
     if (!options.headers) options.headers = {};
@@ -55,6 +56,8 @@ class RestClient {
     }
 
     async request(options) {
+        const begin = Date.now();
+
         options = prepareOptions(options, this.options);
 
         await callHookListeners(this._preHooks, { type: 'pre', options });
@@ -75,7 +78,13 @@ class RestClient {
                 wasHookError = true;
                 throw err;
             });
-            if (options.debug) console.log('requestp-res', { method: options.method, url: options.url, resp, axiosResp, options, axiosOptions });
+            const stook = Number(axiosResp.headers['debug-took'] || '-1');
+            if (options.debug || options.debugResponse) {
+                console.groupCollapsed('requestp-res', { method: options.method, url: options.url, took: Date.now() - begin, stook, resp, axiosResp, options, axiosOptions });
+                console.log(resp);
+                console.trace();
+                console.groupEnd();
+            }
             return resp;
         }
         catch (err) {
@@ -84,7 +93,7 @@ class RestClient {
                 terr.isCancel = true;
                 throw terr;
             }
-            if (options.debug) console.warn('requestp-res', { method: options.method, url: options.url, err, options, axiosOptions });
+            if (options.debug || options.debugResponse) console.warn('requestp-res', { method: options.method, url: options.url, took: Date.now() - begin, err, options, axiosOptions });
             if (wasHookError) {
                 throw err;
             }
