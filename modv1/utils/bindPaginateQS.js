@@ -1,4 +1,4 @@
-import { defaultsDeep } from '@olibm/js1'
+import { defaultsDeep, cloneDeep } from '@olibm/js1'
 
 
 
@@ -11,20 +11,21 @@ export default function () {
     };
     let paginateDefaults = { ...paginateOriginalDefaults };
 
+    // NB! paginateDefaults is applied to the original defaultValue
     function bindPaginateQS(queryPrefix, defaultValue, { modelPrefix } = {}) {
-        defaultValue = defaultsDeep(defaultValue || {}, paginateDefaults);
+        defaultValue = cloneDeep(defaultsDeep(defaultValue || {}, cloneDeep(paginateDefaults)));
         if (typeof arguments[2] === 'string') {
             modelPrefix = arguments[2];
         }
         modelPrefix = modelPrefix || queryPrefix;
 
-        for (let key of Object.getOwnPropertyNames(defaultValue)) {
+        Object.keys(defaultValue).forEach(key => {
             this.$js1.bindQS(`${queryPrefix}.${key}`, defaultValue[key], {
                 modelName: `${modelPrefix}.${key}`,
                 patchMode: key === 'page' ? 'push' : 'replace',
                 nullQueryValue: 'null',
             });
-        }
+        });
     }
 
     return [
