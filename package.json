@@ -1,13 +1,13 @@
 {
   "name": "@olibm/js1-vue",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "js1-vue",
   "repository": "https://github.com/olibm/js1-vue",
   "author": "olibm",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "test": "npm audit"
+    "test": "yarn audit"
   },
   "dependencies": {
     "dotenv": "^8.2.0"
@@ -15,6 +15,6 @@
   "peerDependencies": {
     "@olibm/js1": "^1.0.1",
     "lodash": "^4.17.20",
-    "axios": "^0.20.0"
+    "axios": "^0.21.0"
   }
 }
