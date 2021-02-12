@@ -1,24 +1,8 @@
+const { resolve } = require('path');
+
 // Extend eslintrc with common defaults
 module.exports = function (cfg) {
-    Object.assign(cfg.rules, {
-        'brace-style': ['error', 'stroustrup'],
-        'comma-dangle': ['error', 'always-multiline'],
-        'no-multiple-empty-lines': 'off',
-        'no-return-assign': 'off',
-        'no-unreachable': 'warn',
-        'no-unused-vars': 'warn',
-        'operator-linebreak': 'off',
-        'padded-blocks': 'off',
-        'prefer-const': 'off',
-        'promise/param-names': 'off',
-        'quote-props': 'off',
-        'semi': 'off',
-        'vue/no-unused-components': 'warn',
-        'space-before-function-paren': ['error', {
-            anonymous: 'always',
-            named: 'never',
-            asyncArrow: 'always',
-        }],
-    })
+    console.warn(`eslintrcv1.cjs is deprecated. Add a direct reference  to './node_modules/@olibm/js1-vue/qenv/eslintrc/javascript-v100.cjs' in cfg.extends instead.`);
+    cfg.extends.push(resolve(__dirname, './eslintrc/javascript-v100.cjs'));
     return cfg;
 };
