@@ -1,8 +1,8 @@
 {
-  "name": "@olibm/js1-vue",
+  "name": "@we-made/js1-vue",
   "version": "1.0.2",
   "description": "js1-vue",
-  "repository": "https://github.com/olibm/js1-vue",
+  "repository": "https://github.com/wemadefree/js1-vue",
   "author": "olibm",
   "license": "MIT",
   "type": "module",
