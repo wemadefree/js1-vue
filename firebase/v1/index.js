@@ -1,2 +1,2 @@
-export * from '../index'
-export * from './beginOnIdTokenChanged'
+export * from '../index.js'
+export * from './beginOnIdTokenChanged.js'

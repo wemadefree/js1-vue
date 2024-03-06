@@ -1,5 +1,4 @@
-import { defaultsDeep, cloneDeep } from '@olibm/js1'
-
+import { defaultsDeep, cloneDeep } from '../../wraputil.mjs'
 
 
 export default function () {

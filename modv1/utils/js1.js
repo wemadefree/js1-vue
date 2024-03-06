@@ -1,5 +1,5 @@
-import { isFunction } from '@olibm/js1'
-import * as JS1 from '@olibm/js1'
+import * as JS1 from '@we-made/js1'
+import { isFunction } from '../../wraputil.mjs'
 
 export default function () {
     return Object.keys(JS1).map(name => {

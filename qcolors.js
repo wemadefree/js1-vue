@@ -1,4 +1,5 @@
-import { crc32FromIndex } from '@olibm/js1'
+import crc32 from '@we-made/js1/lib/crc32.js'
+const { crc32FromIndex } = crc32;
 
 export const baseColors = Object.freeze([
     'red',

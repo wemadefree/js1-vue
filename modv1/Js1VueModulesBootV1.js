@@ -1,5 +1,5 @@
-import { installVueUtils } from './utils'
-import js1VuexModule from './Js1VuexModule'
+import { installVueUtils } from './utils/index.js'
+import js1VuexModule from './Js1VuexModule.js'
 
 export default class Js1VueModulesBootV1 {
     constructor({ Modules }) {
@@ -17,11 +17,17 @@ export default class Js1VueModulesBootV1 {
 
         store.registerModule('js1', js1VuexModule);
 
-        installVueUtils(Vue);
+        installVueUtils(app, Vue);
 
         if (app.i18n && Modules.i18n) {
-            for (let key of Object.keys(Modules.i18n)) {
-                app.i18n.mergeLocaleMessage(key, Modules.i18n[key]);
+            const keys = Object.keys(Modules.i18n);
+            if (keys.length && !app.i18n || !app.i18n.mergeLocaleMessage) {
+                console.warn('app.i18n.mergeLocaleMessage is missing. Did you forget app.use(i18n) ?');
+            }
+            else {
+                for (let key of keys) {
+                    app.i18n.mergeLocaleMessage(key, Modules.i18n[key]);
+                }
             }
         }
 

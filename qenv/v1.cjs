@@ -42,6 +42,15 @@ function qenvDotEnvParse(ctx, rootDir, env, opts) {
 
     const o = {};
     Object.keys(envv).sort().forEach(key => o[key] = envv[key]);
+    return trimStrings(o);
+}
+
+function trimStrings(o) {
+    Object.entries(o).forEach(([key, val]) => {
+        if (typeof val === 'string') {
+            o[key] = o[key].trim();
+        }
+    });
     return o;
 }
 
@@ -82,6 +91,15 @@ function execCommand(cmd, rootDir, opts) {
     return require('child_process').execSync(cmd, { cwd: rootDir }).toString().trim();
 }
 
+function fixProxyPath(p) {
+    p = (p || '').trim();
+    if (!p) return '/api/';
+    if (!p.startsWith('/')) p = '/' + p;
+    if (!p.endsWith('/')) p += '/';
+    return p;
+}
+
 exports.qenvLoad = qenvLoad;
 exports.qenvDotEnvParse = qenvDotEnvParse;
 exports.qenvBuildInfo = qenvBuildInfo;
+exports.fixProxyPath = fixProxyPath;

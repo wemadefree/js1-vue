@@ -1,5 +1,4 @@
-import { sortBy, defaultsDeep, isFunction, firstDuplicateBy, flattenBy, ulidlc, forOwn, camelCase } from '@olibm/js1'
-
+import { sortBy, defaultsDeep, isFunction, firstDuplicateBy, flattenBy, ulidlc, forOwn, camelCase } from '../wraputil.mjs'
 export default class Js1VueModulesIndexV1 {
     constructor({ requireModule, modules, externalModules, routes, storeModules, menuItems, bootFunctions, i18n, defaultMenuOrder, defaultRouteComponent, defaultMenuSection, storeIdCamelCase }) {
         this.requireModule = requireModule;
@@ -224,7 +223,15 @@ export default class Js1VueModulesIndexV1 {
         // Queue final step
         this.bootFunctions.push(context => {
             if (this.routes.length) {
-                context.router.addRoutes(this.routes);
+                if (context.router.addRoute) {
+                    this.routes.forEach(route => context.router.addRoute(route));
+                }
+                else if (context.router.addRoutes) {
+                    context.router.addRoutes(this.routes);
+                }
+                else {
+                    console.warn(' Unable to add routes because router.addRoute is missing');
+                }
             }
 
             this.leftMenuItems.splice(0, this.leftMenuItems.length, ...sortBy(this.leftMenuItems, x => x.order))

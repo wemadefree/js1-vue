@@ -1,4 +1,4 @@
-import { getPath, setPath } from '@olibm/js1'
+import { getPath, setPath } from '../../wraputil.mjs'
 
 function bindQS(queryName, defaultValue = '', { modelName, canPatchRoute, converter, toQueryConverter, patchMode, nullQueryValue, patchDebounce } = {}) {
     if (typeof arguments[2] === 'string') {

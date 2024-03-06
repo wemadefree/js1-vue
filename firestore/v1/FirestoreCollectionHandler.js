@@ -1,16 +1,16 @@
-import { fixFirebaseData, mapFirebaseData } from './utils'
-import { jsonClone, ulidlc } from '@olibm/js1'
+import { fixFirebaseData, mapFirebaseData } from './utils.js'
+import { jsonClone, ulidlc } from '../../wraputil.mjs'
 
 /*
 Extending the class in a webpack project may cause this error:
   Class constructor cannot be invoked without 'new'
 
 # Workaround A:
-import { FirestoreCollectionHandlerES5 } from '@olibm/js1-vue/firestore/v1'
+import { FirestoreCollectionHandlerES5 } from '@we-made/js1-vue/firestore/v1'
 export class FirestoreCollectionHandler extends FirestoreCollectionHandlerES5 { constructor() { super(...arguments) } }
 
 # Workaround B:
-import { FirestoreCollectionHandler as FCH } from '@olibm/js1-vue/firestore/v1'
+import { FirestoreCollectionHandler as FCH } from '@we-made/js1-vue/firestore/v1'
 export class FirestoreCollectionHandler {
     constructor() {
         let workaround = new FCH(...arguments);

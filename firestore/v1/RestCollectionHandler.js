@@ -1,4 +1,4 @@
-import { jsonClone } from '@olibm/js1'
+import { jsonClone } from '../../wraputil.mjs'
 
 export class RestCollectionHandler {
     constructor({ collectionId, noTenantScope, restBaseUrl, restClient }, { tenantId, userId }) {

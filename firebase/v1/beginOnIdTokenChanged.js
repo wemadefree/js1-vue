@@ -1,4 +1,4 @@
-import { getFirebase } from '../index'
+import { getFirebase } from '../index.js'
 
 export async function beginOnIdTokenChanged(fn) {
     const firebase = getFirebase();

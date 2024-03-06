@@ -1,17 +1,23 @@
-import { ulidlc, uniq, sortBy as lodashSortBy, cloneDeep, pick, mapValues, defaultsDeep } from '@olibm/js1'
-import { FirestoreCollectionHandler } from './FirestoreCollectionHandler'
-import { RestCollectionHandler } from './RestCollectionHandler'
-import { getFirebase } from '../../firebase'
+import { uniq, cloneDeep, sortBy as lodashSortBy, pick, mapValues } from '../../wraputil.mjs'
+import { FirestoreCollectionHandler } from './FirestoreCollectionHandler.js'
+import { RestCollectionHandler } from './RestCollectionHandler.js'
+import { getFirebase } from '../../firebase/index.js'
 
-export { setFirebase } from '../../firebase'
-export * from './utils'
-export * from './FirestoreCollectionHandler'
-export * from './RestCollectionHandler'
+export { setFirebase } from '../../firebase/index.js'
+export * from './utils.js'
+export * from './FirestoreCollectionHandler.js'
+export * from './RestCollectionHandler.js'
 
 let _defaultFirestore = null;
 function getDefaultFirestore() {
     if (!_defaultFirestore) {
-        _defaultFirestore = getFirebase().firestore();
+        const fb = getFirebase();
+        if (fb && fb.firestore) {
+            _defaultFirestore = fb.firestore();
+        }
+        else {
+            console.log('firebase/firestore module is not loaded');
+        }
     }
     return _defaultFirestore;
 }

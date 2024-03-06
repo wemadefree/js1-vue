@@ -1,4 +1,4 @@
-import { isFunction } from '@olibm/js1'
+import { isFunction } from '../../wraputil.mjs'
 
 // Same as $root.$on / $root.$once except this one will $root.$off when component is destroyed
 
