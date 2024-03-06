@@ -22,6 +22,7 @@ function prepareOptions(options, defaultOptions) {
     json: true,
     debug: false,
     debugResponse: false,
+    responseType: 'json',
   });
   if (!options.qs) options.qs = {};
   if (!options.headers) options.headers = {};
@@ -190,6 +191,7 @@ function toAxiosOptions(options) {
     params: options.qs,
     data: options.body,
     cancelToken: options.cancelToken,
+    responseType: options.responseType,
   };
 
   if (options.auth.bearer) {
